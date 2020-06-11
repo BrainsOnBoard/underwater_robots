@@ -1,15 +1,23 @@
 #!/usr/bin/python
-import ast, cv2, glob, numpy as np, os, sys
+import ast
+import cv2
+import glob
+import numpy as np
+import os
+import sys
 from matplotlib import pyplot as plt
+
 
 def press(event):
     global key
     key = event.key
 
+
 def get_ref_point(image):
     plt.imshow(image)
     plt.draw()
     return plt.ginput()[0]
+
 
 def get_diffs_user_input(images):
     # I can't figure out how else to get keypresses along with ginput(), but this is
@@ -35,10 +43,12 @@ def get_diffs_user_input(images):
             i += 1
     return diffs
 
+
 def save_diffs(diffs, diffspath):
     with open(diffspath, 'w') as f:
         f.write(repr(diffs))
     print('Diffs saved to', diffspath)
+
 
 def cumsum(lists):
     cu_list = []
@@ -46,18 +56,39 @@ def cumsum(lists):
     cu_list = [sum(lists[0:x:1]) for x in range(0, length + 1)]
     return cu_list
 
+
 def get_image_paths(dirname):
     return sorted(glob.glob(os.path.join(dirname, '*.jpg')))
 
+
 def load_images(dirname):
     images = []
-    for p in get_image_paths(dirname):
-        im = cv2.imread(p)
-        cv2.cvtColor(im, cv2.COLOR_BGR2RGB, im)
-        assert(im.dtype == np.uint8)
-        images.append(im.astype(np.double) / float(255))
+    for path in get_image_paths(dirname):
+        images.append(read_image(path))
     print('%i images loaded' % len(images))
     return images
+
+
+def read_image(path):
+    im = cv2.imread(path)
+    cv2.cvtColor(im, cv2.COLOR_BGR2RGB, im)
+    assert(im.dtype == np.uint8)
+    return im.astype(np.double) / float(255)
+
+
+def read_image_greyscale(path):
+    im = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    assert(im.dtype == np.uint8)
+    return im.astype(np.double) / float(255)
+
+
+def load_images_greyscale(dirname):
+    images = []
+    for path in get_image_paths(dirname):
+        images.append(read_image_greyscale(path))
+    print('%i images loaded' % len(images))
+    return images
+
 
 def get_diffs(dirname, images):
     diffspath = os.path.join(dirname, 'diffs.py')
@@ -71,6 +102,7 @@ def get_diffs(dirname, images):
         save_diffs(diffs, diffspath)
     return diffs
 
+
 def stitch_interactive(dirname):
     # Load all images in folder
     images = load_images(dirname)
@@ -80,13 +112,15 @@ def stitch_interactive(dirname):
 
     # Do stitching
     cdiffs = cumsum(diffs[0])
-    from_left = cdiffs[-1] < 0 # camera might have been going left or right
+    from_left = cdiffs[-1] < 0  # camera might have been going left or right
     if from_left:
         cdiffs = [abs(c) for c in cdiffs]
     return stitch(images, cdiffs, from_left)
 
+
 def stitch_static_mean(dirname, from_left, mean_diff):
     return stitch_static_images(dirname, from_left, load_images(dirname), mean_diff)
+
 
 def stitch_static(dirname, from_left):
     images = load_images(dirname)
@@ -94,10 +128,12 @@ def stitch_static(dirname, from_left):
     mean_diff = sum(xdiffs) / len(xdiffs)
     return stitch_static_images(dirname, from_left, images, mean_diff)
 
+
 def stitch_static_images(dirname, from_left, images, mean_diff):
     print('Mean difference:', mean_diff)
     cdiffs = cumsum([mean_diff] * len(get_image_paths(dirname)))
     return stitch(images, cdiffs, from_left)
+
 
 def stitch(images, cdiffs, from_left):
     # Do stitching
@@ -112,10 +148,11 @@ def stitch(images, cdiffs, from_left):
 
         # Overlay current image on top of panorama (excluding nans)
         ims = np.empty((height, width, channels, 2), dtype=np.double)
-        ims[:,:,:,0] = images[i]
-        ims[:,:,:,1] = panorama[:, hlo:(hlo + width), :]
-        panorama[:, hlo:(hlo+width), :] = np.nanmean(ims,3)
+        ims[:, :, :, 0] = images[i]
+        ims[:, :, :, 1] = panorama[:, hlo:(hlo + width), :]
+        panorama[:, hlo:(hlo+width), :] = np.nanmean(ims, 3)
     return panorama
+
 
 if __name__ == '__main__':
     panorama = stitch_interactive(sys.argv[1])
