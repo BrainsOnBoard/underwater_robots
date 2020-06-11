@@ -46,9 +46,12 @@ def cumsum(lists):
     cu_list = [sum(lists[0:x:1]) for x in range(0, length + 1)]
     return cu_list
 
+def get_image_paths(dirname):
+    return sorted(glob.glob(os.path.join(dirname, '*.jpg')))
+
 def load_images(dirname):
     images = []
-    for p in sorted(glob.glob(os.path.join(dirname, '*.jpg'))):
+    for p in get_image_paths(dirname):
         im = cv2.imread(p)
         cv2.cvtColor(im, cv2.COLOR_BGR2RGB, im)
         assert(im.dtype == np.uint8)
@@ -68,7 +71,7 @@ def get_diffs(dirname, images):
         save_diffs(diffs, diffspath)
     return diffs
 
-def stitch(dirname):
+def stitch_interactive(dirname):
     # Load all images in folder
     images = load_images(dirname)
 
@@ -76,17 +79,35 @@ def stitch(dirname):
     diffs = get_diffs(dirname, images)
 
     # Do stitching
-    height, width, channels = images[0].shape
     cdiffs = cumsum(diffs[0])
     from_left = cdiffs[-1] < 0 # camera might have been going left or right
-    cmax = round(max(abs(c) for c in cdiffs))
+    if from_left:
+        cdiffs = [abs(c) for c in cdiffs]
+    return stitch(images, cdiffs, from_left)
+
+def stitch_static_mean(dirname, from_left, mean_diff):
+    return stitch_static_images(dirname, from_left, load_images(dirname), mean_diff)
+
+def stitch_static(dirname, from_left):
+    images = load_images(dirname)
+    xdiffs, _ = get_diffs(dirname, images)
+    mean_diff = sum(xdiffs) / len(xdiffs)
+    return stitch_static_images(dirname, from_left, images, mean_diff)
+
+def stitch_static_images(dirname, from_left, images, mean_diff):
+    print('Mean difference:', mean_diff)
+    cdiffs = cumsum([mean_diff] * len(get_image_paths(dirname)))
+    return stitch(images, cdiffs, from_left)
+
+def stitch(images, cdiffs, from_left):
+    # Do stitching
+    height, width, channels = images[0].shape
+    cmax = round(max(cdiffs))
     panorama = np.empty(((height, width + cmax, channels)), images[0].dtype)
     panorama[:] = np.NaN
     for i in range(len(images)):
         hlo = round(cdiffs[i])
-        if from_left:
-            hlo = -hlo
-        else:
+        if not from_left:
             hlo = panorama.shape[1] - width - hlo
 
         # Overlay current image on top of panorama (excluding nans)
@@ -97,6 +118,6 @@ def stitch(dirname):
     return panorama
 
 if __name__ == '__main__':
-    panorama = stitch(sys.argv[1])
+    panorama = stitch_interactive(sys.argv[1])
     plt.imshow(panorama)
     plt.show()
