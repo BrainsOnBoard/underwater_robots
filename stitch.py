@@ -140,7 +140,7 @@ def stitch(images, cdiffs, from_left):
     # Do stitching
     height, width, channels = images[0].shape
     cmax = round(max(cdiffs))
-    panorama = np.empty(((height, width + cmax, channels)), images[0].dtype)
+    panorama = np.empty(((height, width + cmax, channels, len(images))), images[0].dtype)
     panorama[:] = np.NaN
     for i in range(len(images)):
         hlo = round(cdiffs[i])
@@ -148,10 +148,8 @@ def stitch(images, cdiffs, from_left):
             hlo = cmax - hlo
 
         # Overlay current image on top of panorama (excluding nans)
-        ims = np.empty((height, width, channels, 2), dtype=np.double)
-        ims[:, :, :, 0] = images[i]
-        ims[:, :, :, 1] = panorama[:, hlo:(hlo + width), :]
-        panorama[:, hlo:(hlo+width), :] = np.nanmean(ims, 3)
+        panorama[:, hlo:(hlo + width),:, i] = images[i]
+    panorama = np.nanmean(panorama, 3)
     return panorama
 
 
