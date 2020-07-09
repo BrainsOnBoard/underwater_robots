@@ -132,10 +132,11 @@ def stitch_static(dirname, from_left):
 def stitch_static_images(dirname, from_left, images, mean_diff):
     print('Mean difference:', mean_diff)
     cdiffs = cumsum([mean_diff] * len(get_image_paths(dirname)))
-    return stitch(images, cdiffs, from_left)
+    return stitch(images, cdiffs[:-1], from_left)
 
 
 def stitch(images, cdiffs, from_left):
+    assert(len(images) == len(cdiffs))
     # Do stitching
     height, width, channels = images[0].shape
     cmax = round(max(cdiffs))
@@ -144,7 +145,7 @@ def stitch(images, cdiffs, from_left):
     for i in range(len(images)):
         hlo = round(cdiffs[i])
         if not from_left:
-            hlo = panorama.shape[1] - width - hlo
+            hlo = cmax - hlo
 
         # Overlay current image on top of panorama (excluding nans)
         ims = np.empty((height, width, channels, 2), dtype=np.double)
