@@ -1,0 +1,3 @@
+[submodule "navbench"]
+	path = navbench
+	url = ../navbench
